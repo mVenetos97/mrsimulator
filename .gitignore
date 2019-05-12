@@ -120,3 +120,4 @@ test**
 *.mp4
 *.html
 *.png
+setup_cython.py
