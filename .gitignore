@@ -31,7 +31,6 @@ cython_debug/**
 
 # Installer logs
 pip-log.txt
-pip-delete-this-directory.txt
 
 # Unit test / coverage reports
 htmlcov/
@@ -77,12 +76,6 @@ target/
 # pyenv
 .python-version
 
-# celery beat schedule file
-celerybeat-schedule
-
-# SageMath parsed files
-*.sage.py
-
 # Environments
 .env
 .venv
@@ -96,9 +89,6 @@ venv.bak/
 .spyderproject
 .spyproject
 
-# Rope project settings
-.ropeproject
-
 # mkdocs documentation
 /site
 
@@ -110,6 +100,9 @@ venv.bak/
 
 # build
 *.DSYM/**
+
+# folders
+src/c_lib/test_c/**
 
 # files
 *.out
@@ -123,7 +116,11 @@ sideband2.c
 dmfit_comparision.py
 simulate_lineshape.py
 sideband.3
-mrsimulator.code-workspace
+sandbox.c
+nmr_methods.c
+main.c
+*.code-workspace
 jquery.js
-mrsimulator/scr/main.c
-Max.code-workspace
+setup.py.src
+setup.temp
+__config__.json

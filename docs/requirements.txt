@@ -1,6 +1,6 @@
 
 sphinx>=2.0
-sphinx_rtd_theme
+sphinxjp.themes.basicstrap
 breathe
 exhale
 numpy>=1.13.3

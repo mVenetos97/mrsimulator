@@ -1,243 +1,161 @@
-# -*- coding: utf-8 -*-
-import io
-
-from setuptools import Extension
-from setuptools import find_packages
-from setuptools import setup
-
-from Cython.Distutils import build_ext
-from Cython.Build import cythonize
-
-from os import listdir
-from os.path import join
-from os.path import abspath
-from os.path import dirname
-from os.path import split
-from os.path import exists
-import platform
-import numpy as np
-import os
-
-mkl=False
-accelerate = False
-
-print(platform.system())
-if platform.system() == 'Windows': mkl =True
-if platform.system() == 'Linux': mkl =True
-if platform.system() == 'Darwin' : accelerate = True
-# mkl = False
-
-if accelerate is False:
-    if np.__config__.blas_mkl_info != {}:
-        mkl = True
-    else:
-        raise Exception((
-            "mkl bindings for Numpy is not installed. You might have `nomkl` "
-            "installed which prevents from installing mkl. Try removing `nomkl` "
-            "with `conda remove nomkl` and then try installing mrsimulator."
-        ))
-
-
-if mkl:
-    include_path = np.__config__.blas_mkl_info["include_dirs"]
-    include_path = [abspath(_) for _ in include_path]
-    # include_path.append(abspath("C:/MinGW/bin"))
-    # include_path.append("C:/mingw-w64/x86_64-8.1.0-posix-seh-rt_v6-rev0/mingw64/bin")
-if accelerate:
-    include_path = ["/System/Library/Frameworks/Accelerate.framework"]
-
-# other include paths
-include_path.append(abspath("mrsimulator/scr/include"))
-include_path.append(np.get_include())
-print(include_path)
-
-# Package meta-data.
-NAME = "mrsimulator"
-DESCRIPTION = "A python toolbox for simulating NMR spectra"
-URL = "https://github.com/DeepanshS/mrsimulator/"
-EMAIL = "srivastava.89@osu.edu"
-AUTHOR = "Deepansh J. Srivastava"
-REQUIRES_PYTHON = ">=3.0"
-VERSION = "0.1.1"
-
-
-# What packages are required for this module to be executed?
-REQUIRED = [
-    "numpy>=1.13.3",
-    "cython>=0.29.11",
-    "astropy>=3.0",
-    # "mkl>=2019",
-    # "mkl-include>=2019",
-    "requests>=2.21.0",
-    # "matplotlib>=3.0.2",
-    "numba",
-]
-
-# What packages are optional?
-EXTRAS = {"fancy feature": ["plotly>=3.6", "dash>=0.40", "dash_daq>=0.1"]}
-
-
-here = abspath(dirname(__file__))
-# Import the README and use it as the long-description.
-# Note: this will only work if 'README.md' is present in your MANIFEST.in file!
-try:
-    with io.open(join(here, "README.md"), encoding="utf-8") as f:
-        long_description = "\n" + f.read()
-except FileNotFoundError:
-    long_description = DESCRIPTION
-
-# Load the package's __version__.py module as a dictionary.
-about = {}
-if not VERSION:
-    project_slug = NAME.lower().replace("-", "_").replace(" ", "_")
-    with open(join(here, project_slug, "__version__.py")) as f:
-        exec(f.read(), about)
-else:
-    about["__version__"] = VERSION
-
-
-cmdclass = {}
-ext_modules = []
-cmdclass.update({"build_ext": build_ext})
-
-
-# c source folder
-nmr_lib_source_dir = "./mrsimulator/scr/lib"
-_source_files = []
-for _file in listdir(nmr_lib_source_dir):
-    if _file.endswith(".c"):
-        _source_files.append(join(nmr_lib_source_dir, _file))
-
-nmr_function_source_file = _source_files[:]
-
-nmr_function_source_dir = "./mrsimulator/scr/mrmethods"
-for _file in listdir(nmr_function_source_dir):
-    if _file.endswith(".c") and _file != "nmr_methods.c":
-        nmr_function_source_file.append(abspath(join(nmr_function_source_dir, _file)))
-
-
-source2 = nmr_function_source_file[:]
-cy_file = "./mrsimulator/scr/mrmethods/nmr_methods.pyx"
-nmr_function_source_file.append(abspath(cy_file))
-
-
-print("NMR method Source files----------------------------------")
-for item in nmr_function_source_file:
-    print(item)
-
-
-def get_config(platform_):
-    if platform_ == "Windows":
-        return Windows()
-    if platform_ == "Linux":
-        return Windows()
-    if platform_ == "Darwin":
-        return Darwin()
-
-
-def Darwin():
-    config = {}
-    if accelerate:
-        # include_path.append('/System/Library/Frameworks/Accelerate.framework')
-
-        config["libraries"] = []
-        config["library_dirs"] = []
-        config["extra_link_args"] = ["-Wl,-framework", "-Wl,Accelerate"]
-        config["extra_compile_args"] = ["-msse3", "-O1"]
-
-    if mkl:
-        # lib = ["mkl_intel_lp64", "mkl_core", "pthread"]
-        lib_path = [abspath(_) for _ in np.__config__.blas_mkl_info["library_dirs"]]
-
-        config = {}
-        config["libraries"] = np.__config__.blas_mkl_info["libraries"]
-        config["library_dirs"] = lib_path
-        config["extra_link_args"] = ["-lm", "-ldl", "-W"]
-        config["extra_compile_args"] = ["-m64", "-g", "-msse3", "-O1"]
-    return config
-
-
-def Windows():
-    # lib = ["mkl_intel_lp64_dll", "mkl_core_dll", "mkl_intel_thread_dll"]    a = join(split(np.__config__.blas_mkl_info["library_dirs"][0])[0], "bin")
-    lib_path = [abspath(_) for _ in np.__config__.blas_mkl_info["library_dirs"]]    lib_path.append(abspath(a))    print(lib_path)
-    if mkl:
-        # inc_path = np.__config__.blas_mkl_info['include_dirs']
-        # [include_path.append(_) for _ in inc_path]
-        config = {}
-        config["libraries"] = np.__config__.blas_mkl_info["libraries"]
-        config["library_dirs"] = lib_path
-        config["extra_link_args"] = []
-        config["extra_compile_args"] = []#"-O3", "-W"]
-    return config
-
-
-config = get_config(platform.system())
-print(config)
-
-ext_modules = [
-    Extension(
-        name=NAME + ".methods",
-        sources=nmr_function_source_file,
-        include_dirs=include_path,
-        language="c",
-        libraries=config["libraries"],
-        library_dirs=config["library_dirs"],
-        extra_compile_args=config["extra_compile_args"],
-        extra_link_args=config["extra_link_args"]
-        # extra_link_args="-g -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core \
-        #                  -liomp5 -lpthread -lm -ldl -W".split(),
-    )
-]
-
-
-# Sandbox
-
-sandbox_files = source2[:]
-
-_list = ["mrsimulator", "scr", "sandbox", "sandbox.pyx"]
-sandbox_files.append(abspath(join(*_list)))
-
-ext_modules += [
-    Extension(
-        name=NAME + ".sandbox",
-        sources=sandbox_files,
-        include_dirs=include_path,
-        language="c",
-        libraries=config["libraries"],
-        library_dirs=config["library_dirs"],
-        extra_compile_args=config["extra_compile_args"],
-        extra_link_args=config["extra_link_args"]
-        # extra_link_args="-g -lmkl_intel_lp64 -lmkl_intel_thread \
-        #                 -lmkl_core -ldl -liomp5 -lpthread -lm -W".split()
-        # extra_link_args="-g -lmkl_intel_lp64 -lmkl_intel_thread \
-        #                 -lmkl_core -ldl -liomp5 -lpthread -lm -Wl".split(),
-    )
-]
-
-ext = cythonize(ext_modules, annotate=True, language_level=3, gdb_debug=True)
-
-setup(
-    name=NAME,
-    version=about["__version__"],
-    description=DESCRIPTION,
-    long_description=long_description,
-    author=AUTHOR,
-    author_email=EMAIL,
-    python_requires=REQUIRES_PYTHON,
-    url=URL,
-    packages=find_packages(),
-    install_requires=REQUIRED,
-    extras_require=EXTRAS,
-    license="BSD-3-Clause",
-    # data_files = ['mrsimulator/test/isotopomers.json'],
-    cmdclass=cmdclass,
-    # cythonize(ext_modules, annotate=True, language_level=3, gdb_debug=True),
-    ext_modules=ext,
-    # ext_modules = cythonize(ext_modules)  ? not in 0.14.1
-    classifiers=[
-        # Trove classifiers
-        # Full list: https://pypi.python.org/pypi?%3Aaction=list_classifiers
-        "License :: OSI Approved :: BSD License",
-        "Programming Language :: Python :: 3",
-    ],
-)
+# -*- coding: utf-8 -*-
+
+from setuptools import Extension
+from setuptools import find_packages
+from setuptools import setup
+
+from Cython.Build import cythonize
+
+from os.path import join
+from os.path import abspath
+from os.path import dirname
+import platform
+
+import numpy as np
+import numpy.distutils.system_info as sysinfo
+
+import json
+
+module_dir = dirname(abspath(__file__))
+
+include_dirs = []
+library_dirs = []
+libraries = []
+openblas_info = sysinfo.get_info("openblas")
+fftw3_info = sysinfo.get_info("fftw3")
+# mkl_info = sysinfo.get_info("mkl")
+
+# if mkl_info != {}:
+#     name = "mkl"
+#     include_dirs += mkl_info["include_dirs"]
+#     library_dirs += mkl_info["library_dirs"]
+# libraries += mkl_info["libraries"]
+if openblas_info != {}:
+    name = "openblas"
+    library_dirs += openblas_info["library_dirs"]
+    libraries += openblas_info["libraries"]
+    libraries += ["pthread"]
+# else:
+#     raise Exception("mkl blas or openblas library not found.")
+
+include_dirs += fftw3_info["include_dirs"]
+library_dirs += fftw3_info["library_dirs"]
+libraries += fftw3_info["libraries"]
+
+include_dirs = list(set(include_dirs))
+library_dirs = list(set(library_dirs))
+libraries = list(set(libraries))
+
+blas_info = {
+    "name": name,
+    "library_dirs": library_dirs,
+    "include_dirs": include_dirs,
+    "libraries": libraries,
+}
+
+print(blas_info)
+
+with open("src/mrsimulator/__config__.json", "w", encoding="utf8") as outfile:
+    json.dump(blas_info, outfile, ensure_ascii=True, indent=2)
+
+# other include paths
+include_dirs.append("src/c_lib/include")
+include_dirs.append(np.get_include())
+
+extra_link_args = []
+extra_compile_args = []
+
+# system = platform.system()
+# arch = platform.architecture()[0]
+# compiler = platform.python_compiler()
+# if system == 'Linux':
+#     extra_link_args += ["-lm", "-ldl"]
+#     if arch == '64bit':
+#         extra_compile_args += ["-m64", "-DMKL_ILP64"]
+#     if arch == '32bit':
+#         extra_compile_args += ["-m32"]
+# if system == 'Darwin':
+#     extra_link_args += ["-Wl", "-lm", "-ldl"]
+#     extra_compile_args += ["-m64"]
+
+print(extra_compile_args)
+print(extra_link_args)
+ext_modules = [
+    Extension(
+        name="mrsimulator.methods",
+        sources=[
+            "src/c_lib/lib/angular_momentum.c",
+            "src/c_lib/lib/interpolation.c",
+            "src/c_lib/lib/mrsimulator.c",
+            "src/c_lib/lib/octahedron.c",
+            "src/c_lib/lib/spinning_sidebands.c",
+            "src/c_lib/lib/powder_setup.c",
+            "src/c_lib/mrmethods/nmr_methods.pyx",
+        ],
+        include_dirs=include_dirs,
+        language="c",
+        libraries=libraries,
+        library_dirs=library_dirs,
+        extra_compile_args=["--std=c99", "-g", "-O3"] + extra_compile_args,
+        extra_link_args=extra_link_args,
+    )
+]
+
+# Sandbox
+
+ext_modules += [
+    Extension(
+        name="mrsimulator.sandbox",
+        sources=[
+            "src/c_lib/lib/angular_momentum.c",
+            "src/c_lib/lib/interpolation.c",
+            "src/c_lib/lib/mrsimulator.c",
+            "src/c_lib/lib/octahedron.c",
+            "src/c_lib/lib/spinning_sidebands.c",
+            "src/c_lib/lib/powder_setup.c",
+            "src/c_lib/sandbox/sandbox.pyx",
+        ],
+        include_dirs=include_dirs,
+        language="c",
+        libraries=libraries,
+        library_dirs=library_dirs,
+        extra_compile_args=["--std=c99", "-g", "-O3"] + extra_compile_args,
+        extra_link_args=extra_link_args,
+    )
+]
+
+
+setup(
+    name="mrsimulator",
+    version="0.1.0",
+    description="A python toolbox for simulating NMR spectra",
+    long_description=open(join(module_dir, "README.md")).read(),
+    author="Deepansh J. Srivastava",
+    author_email="deepansh2012@gmail.com",
+    python_requires=">=3.6",
+    url="https://github.com/DeepanshS/MRsimulator/",
+    packages=find_packages("src"),
+    package_dir={"": "src"},
+    setup_requires=["numpy>=1.13.3", "setuptools>=27.3", "cython>=0.29.11"],
+    install_requires=[
+        "numpy>=1.13.3",
+        "setuptools>=27.3",
+        "cython>=0.29.11",
+        "astropy>=3.0",
+        "pydantic==0.28",
+        "requests>=2.21.0",
+        "monty==2.0.4",
+        "matplotlib>=3.0.2",
+    ],
+    extras_require={"fancy feature": ["plotly>=3.6", "dash>=0.40", "dash_daq>=0.1"]},
+    ext_modules=cythonize(ext_modules, language_level=3),
+    include_package_data=True,
+    zip_safe=False,
+    license="BSD-3-Clause",
+    classifiers=[
+        # Trove classifiers
+        # Full list: https://pypi.python.org/pypi?%3Aaction=list_classifiers
+        "License :: OSI Approved :: BSD License",
+        "Programming Language :: Python :: 3",
+    ],
+)
